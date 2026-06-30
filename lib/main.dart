@@ -1,36 +1,66 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'screens/loading_screen.dart';
+import 'app_root.dart';
+import 'core/agent_client.dart';
+import 'core/alert_dispatcher.dart';
+import 'core/attribution_tracker.dart';
+import 'core/local_vault.dart';
+import 'core/net_sensor.dart';
+import 'core/verdict_gateway.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase / AppCheck — wrapped because the placeholder config will
+  // throw until real credentials are dropped in. The app must still
+  // launch (local puzzle remains usable without Firebase).
+  try {
+    await Firebase.initializeApp();
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+    );
+  } catch (_) {}
+
+  await SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
     systemNavigationBarColor: Color(0xFF8FD16F),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
-  runApp(const ChickenHopApp());
+
+  await agent.prepare();
+
+  final vault = LocalVault();
+  await vault.warmUp();
+
+  final sensor = NetSensor();
+  final tracker = AttributionTracker();
+  final gateway = VerdictGateway(vault);
+  final alerts = AlertDispatcher(vault);
+
+  // Kick off Firebase Messaging in the background — it self-disables
+  // when the project isn't fully configured.
+  unawaited(alerts.bringOnline());
+
+  runApp(ChickenHopApp(
+    vault: vault,
+    sensor: sensor,
+    tracker: tracker,
+    gateway: gateway,
+    alerts: alerts,
+  ));
 }
 
-class ChickenHopApp extends StatelessWidget {
-  const ChickenHopApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Chicken Hop',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFFC93C),
-          brightness: Brightness.light,
-        ),
-        fontFamily: 'Roboto',
-      ),
-      home: const LoadingScreen(),
-    );
-  }
-}
+void unawaited(Future<void> _) {}

@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-class WebScreen extends StatefulWidget {
+/// Thin WebView wrapper used by the local puzzle menu to surface the
+/// Privacy Policy and Support pages. Lightweight on purpose — no
+/// connectivity probes, no notch handling — these pages are static and
+/// always opened from a deliberate menu tap.
+class InfoStage extends StatefulWidget {
   final String title;
   final String url;
 
-  const WebScreen({super.key, required this.title, required this.url});
+  const InfoStage({super.key, required this.title, required this.url});
 
   @override
-  State<WebScreen> createState() => _WebScreenState();
+  State<InfoStage> createState() => _InfoStageState();
 }
 
-class _WebScreenState extends State<WebScreen> {
+class _InfoStageState extends State<InfoStage> {
   late final WebViewController _controller;
-  bool _loading = true;
+  bool _busy = true;
 
   @override
   void initState() {
@@ -21,16 +25,14 @@ class _WebScreenState extends State<WebScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFFFFFFFF))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            if (mounted) setState(() => _loading = true);
-          },
-          onPageFinished: (_) {
-            if (mounted) setState(() => _loading = false);
-          },
-        ),
-      )
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (_) {
+          if (mounted) setState(() => _busy = true);
+        },
+        onPageFinished: (_) {
+          if (mounted) setState(() => _busy = false);
+        },
+      ))
       ..loadRequest(Uri.parse(widget.url));
   }
 
@@ -53,7 +55,7 @@ class _WebScreenState extends State<WebScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_loading)
+          if (_busy)
             const LinearProgressIndicator(
               backgroundColor: Color(0xFFFFE0B2),
               valueColor: AlwaysStoppedAnimation(Color(0xFFFF8C00)),

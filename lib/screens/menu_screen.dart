@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../flow/info_stage.dart';
+import '../setup/info_pages.dart';
 import '../widgets/wooden_button.dart';
 import 'levels_screen.dart';
-import 'web_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 
-  static const _privacyUrl = 'https://chickennhop.com/privacy-policy.html';
-  static const _supportUrl = 'https://chickennhop.com/support.html';
+  static const _privacyUrl = kPrivacyPolicyLink;
+  static const _supportUrl = kSupportLink;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +60,7 @@ class MenuScreen extends StatelessWidget {
                       primary: false,
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const WebScreen(
+                          builder: (_) => const InfoStage(
                             title: 'Privacy Policy',
                             url: _privacyUrl,
                           ),
@@ -75,7 +76,7 @@ class MenuScreen extends StatelessWidget {
                       primary: false,
                       onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const WebScreen(
+                          builder: (_) => const InfoStage(
                             title: 'Support',
                             url: _supportUrl,
                           ),

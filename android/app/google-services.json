@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "667813603421",
+    "project_id": "chickenhop-b213b",
+    "storage_bucket": "chickenhop-b213b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:667813603421:android:bc66eca18f3a80d98a85b4",
+        "android_client_info": {
+          "package_name": "com.chickhop.chickenhop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9utjZIpjEo1A5a1WhaKnSpEQWq0Ze09k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
