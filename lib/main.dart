@@ -20,12 +20,17 @@ Future<void> main() async {
   // launch (local puzzle remains usable without Firebase).
   try {
     await Firebase.initializeApp();
+    debugPrint('[main] Firebase.initializeApp OK');
     await FirebaseAppCheck.instance.activate(
       androidProvider: kDebugMode
           ? AndroidProvider.debug
           : AndroidProvider.playIntegrity,
     );
-  } catch (_) {}
+    debugPrint('[main] FirebaseAppCheck.activate OK'
+        ' (provider: ${kDebugMode ? "debug" : "playIntegrity"})');
+  } catch (e, st) {
+    debugPrint('[main] Firebase init ERROR: $e\n$st');
+  }
 
   await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
@@ -41,9 +46,11 @@ Future<void> main() async {
   ));
 
   await agent.prepare();
+  debugPrint('[main] agent ready');
 
   final vault = LocalVault();
   await vault.warmUp();
+  debugPrint('[main] vault warm — mode=${vault.readMode()}');
 
   final sensor = NetSensor();
   final tracker = AttributionTracker();
@@ -53,6 +60,7 @@ Future<void> main() async {
   // Kick off Firebase Messaging in the background — it self-disables
   // when the project isn't fully configured.
   unawaited(alerts.bringOnline());
+  debugPrint('[main] runApp →');
 
   runApp(ChickenHopApp(
     vault: vault,

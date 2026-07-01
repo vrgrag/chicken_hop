@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -101,6 +102,7 @@ class _BootGateState extends State<BootGate>
     await _advance(0.15, ms: 220);
 
     final mode = widget.vault.readMode();
+    debugPrint('[BootGate] _run — mode=$mode');
     switch (mode) {
       case LaunchMode.local:
         await _runLocalPath();
@@ -127,7 +129,9 @@ class _BootGateState extends State<BootGate>
 
   // ── First boot ──────────────────────────────────────────────────
   Future<void> _runFirstBootPath() async {
+    debugPrint('[BootGate] firstBoot path started');
     final live = await widget.sensor.isLive();
+    debugPrint('[BootGate] network live=$live');
     if (!live) {
       await _completeBar();
       _jumpToOffline(firstBoot: true);
@@ -135,18 +139,24 @@ class _BootGateState extends State<BootGate>
     }
 
     await _advance(0.35, ms: 280);
+    debugPrint('[BootGate] launching AppsFlyer tracker...');
     await widget.tracker.launch();
+    debugPrint('[BootGate] tracker launched — awaiting firstTouch + deepLink');
     await Future.wait([
       widget.tracker.awaitFirstTouch(),
       widget.tracker.awaitDeepLink(),
     ]);
+    debugPrint('[BootGate] attribution resolved');
     await _advance(0.7, ms: 320);
 
     final body = await widget.tracker.composeVerdictBody(
       locale: Platform.localeName.replaceAll('-', '_'),
       pushToken: widget.alerts.token,
     );
+    debugPrint('[BootGate] consulting verdict endpoint...');
     final verdict = await widget.gateway.consult(body);
+    debugPrint('[BootGate] verdict: accepted=${verdict.accepted}'
+        ' destination=${verdict.destination}');
 
     if (verdict.accepted && (verdict.destination?.isNotEmpty ?? false)) {
       await widget.vault.writeMode(LaunchMode.web);
@@ -161,11 +171,14 @@ class _BootGateState extends State<BootGate>
 
   // ── Returning web ────────────────────────────────────────────────
   Future<void> _runWebPath() async {
+    debugPrint('[BootGate] web (returning) path started');
     final live = await widget.sensor.isLive();
+    debugPrint('[BootGate] network live=$live');
     if (!live) {
       // Even offline we will try to reuse the cached URL — the portal
       // stage itself shows the offline screen if the request fails.
       final saved = widget.vault.readResolvedUrl();
+      debugPrint('[BootGate] offline — saved url=$saved');
       await _completeBar();
       if (saved != null && saved.isNotEmpty) {
         _jumpToPortal(saved);
@@ -177,6 +190,7 @@ class _BootGateState extends State<BootGate>
 
     // Cold-start push URL beats everything.
     final pushed = await widget.vault.takeColdPushUrl();
+    debugPrint('[BootGate] cold push url=$pushed');
     if (pushed != null && pushed.isNotEmpty) {
       await _completeBar();
       _jumpToPortal(pushed);
@@ -184,34 +198,43 @@ class _BootGateState extends State<BootGate>
     }
 
     final saved = widget.vault.readResolvedUrl();
+    debugPrint('[BootGate] cached url=$saved');
     await _advance(0.45, ms: 260);
 
+    debugPrint('[BootGate] launching tracker (returning web)...');
     await widget.tracker.launch();
     await Future.wait([
       widget.tracker
           .awaitFirstTouch(max: const Duration(seconds: 10)),
       widget.tracker.awaitDeepLink(),
     ]);
+    debugPrint('[BootGate] attribution resolved (returning)');
     await _advance(0.75, ms: 260);
 
     final body = await widget.tracker.composeVerdictBody(
       locale: Platform.localeName.replaceAll('-', '_'),
       pushToken: widget.alerts.token,
     );
+    debugPrint('[BootGate] consulting verdict (returning)...');
     final verdict = await widget.gateway.consult(body);
+    debugPrint('[BootGate] verdict: accepted=${verdict.accepted}'
+        ' destination=${verdict.destination}');
 
     await _completeBar();
     if (verdict.accepted && (verdict.destination?.isNotEmpty ?? false)) {
       _jumpToPortal(verdict.destination!);
     } else if (saved != null && saved.isNotEmpty) {
+      debugPrint('[BootGate] verdict refused — falling back to cached url');
       _jumpToPortal(saved);
     } else {
+      debugPrint('[BootGate] no url available — going offline');
       _jumpToOffline(firstBoot: false);
     }
   }
 
   // ── Returning local (puzzle) ─────────────────────────────────────
   Future<void> _runLocalPath() async {
+    debugPrint('[BootGate] local path — going directly to puzzle');
     await _advance(0.55, ms: 280);
     await Future.delayed(const Duration(milliseconds: 220));
     await _completeBar();

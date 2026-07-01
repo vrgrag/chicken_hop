@@ -41,13 +41,16 @@ class AttributionTracker {
     _booted = true;
 
     final key = AppFacade.trackerDevKey;
+    debugPrint('[AttributionTracker] launch — key=${key.isEmpty ? "EMPTY" : "${key.substring(0, 4)}..."}');
     if (key.isEmpty) {
       // No tracker key configured — surface empty attribution and exit.
+      debugPrint('[AttributionTracker] dev key empty — skipping SDK init');
       _completeInstall(const <String, dynamic>{});
       _completeDeepLink();
       return;
     }
 
+    debugPrint('[AttributionTracker] initialising AppsflyerSdk (appId="${AppFacade.trackerAppId}")');
     final options = AppsFlyerOptions(
       afDevKey: key,
       appId: AppFacade.trackerAppId,
@@ -58,11 +61,14 @@ class AttributionTracker {
 
     _sdk!.onInstallConversionData((dynamic data) async {
       final payload = _flatten(data);
+      debugPrint('[AttributionTracker] onInstallConversionData: $payload');
       if ((payload['af_status']?.toString() ?? '') == 'Organic') {
+        debugPrint('[AttributionTracker] Organic detected — waiting ${AppFacade.organicRetryDelaySeconds}s then GCD');
         await Future.delayed(
           const Duration(seconds: AppFacade.organicRetryDelaySeconds),
         );
         final fresh = await _gcdRefresh();
+        debugPrint('[AttributionTracker] GCD result: $fresh');
         _install = fresh ?? payload;
       } else {
         _install = payload;
@@ -72,42 +78,56 @@ class AttributionTracker {
 
     _sdk!.onAppOpenAttribution((dynamic data) {
       _appOpen = _flatten(data);
+      debugPrint('[AttributionTracker] onAppOpenAttribution: $_appOpen');
     });
 
     _sdk!.onDeepLinking((DeepLinkResult result) {
+      debugPrint('[AttributionTracker] onDeepLinking status=${result.status}');
       try {
         final dl = result.deepLink;
         if (dl != null) {
           final ce = dl.clickEvent;
           if (ce.isNotEmpty) {
             _deepLink = Map<String, dynamic>.from(ce);
+            debugPrint('[AttributionTracker] deepLink clickEvent: $_deepLink');
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[AttributionTracker] deepLink parse error: $e');
+      }
       _completeDeepLink();
     });
 
+    debugPrint('[AttributionTracker] calling initSdk...');
     await _sdk!.initSdk(
       registerConversionDataCallback: true,
       registerOnAppOpenAttributionCallback: true,
       registerOnDeepLinkingCallback: true,
     );
+    debugPrint('[AttributionTracker] initSdk done');
   }
 
   Future<Map<String, dynamic>> awaitFirstTouch({
     Duration max = const Duration(seconds: 30),
   }) {
+    debugPrint('[AttributionTracker] awaitFirstTouch (max=${max.inSeconds}s)...');
     return _installCompleter.future.timeout(
       max,
-      onTimeout: () => const <String, dynamic>{},
+      onTimeout: () {
+        debugPrint('[AttributionTracker] awaitFirstTouch TIMED OUT');
+        return const <String, dynamic>{};
+      },
     );
   }
 
   Future<void> awaitDeepLink({
     Duration max = const Duration(seconds: 5),
   }) async {
+    debugPrint('[AttributionTracker] awaitDeepLink (max=${max.inSeconds}s)...');
     await _deepLinkCompleter.future
-        .timeout(max, onTimeout: () {});
+        .timeout(max, onTimeout: () {
+          debugPrint('[AttributionTracker] awaitDeepLink timed out (ok)');
+        });
   }
 
   Future<String?> deviceUid() async {
@@ -125,7 +145,21 @@ class AttributionTracker {
   }) async {
     final body = <String, dynamic>{};
 
-    body.addAll(_install);
+    // Only forward install data that represents real attribution.
+    // If AF returned {status: failure, ...} the payload is noise — skip it
+    // so the config endpoint only receives clean attribution fields.
+    final isAfFailure = _install['status'] == 'failure' ||
+        _install['status'] == 'failure_v2' ||
+        (_install.containsKey('status') && _install['af_status'] == null);
+    if (_install.isNotEmpty && !isAfFailure) {
+      body.addAll(_install);
+      debugPrint('[AttributionTracker] composeBody: AF install data added'
+          ' (af_status=${_install['af_status']})');
+    } else if (_install.isNotEmpty) {
+      debugPrint('[AttributionTracker] composeBody: AF install SKIPPED'
+          ' (status=${_install['status']}) — sending clean body');
+    }
+
     _deepLink.forEach((k, v) => body.putIfAbsent(k, () => v));
     _appOpen.forEach((k, v) => body.putIfAbsent(k, () => v));
 

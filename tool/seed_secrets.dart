@@ -98,7 +98,7 @@ void main() {
     'kVerdictPath': '/config.php',
 
     // setup/tracker_secrets.dart
-    'kTrackerDevKey': 'hWF3hRzM89bQmSUTd3tJYb',
+    'kTrackerDevKey': 'ECm2G9gBTBWAYVMK5a8HKZ',
     'kFirebaseSender': '667813603421',
     'kGcdHost': 'https://gcdsdk.appsflyer.com',
     'kGcdPath': '/install_data/v4.0/',
